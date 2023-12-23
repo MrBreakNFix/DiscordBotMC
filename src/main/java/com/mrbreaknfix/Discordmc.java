@@ -3,15 +3,22 @@ package com.mrbreaknfix;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.fabricmc.api.ModInitializer;
-
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class Discordmc implements ModInitializer {
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Objects;
+
+public class Discordmc extends ListenerAdapter implements ModInitializer {
 	// This logger is used to write text to the console and the log file.
 	// It is considered best practice to use your mod id as the logger's name.
 	// That way, it's clear which mod wrote info, warnings, and errors.
@@ -23,25 +30,53 @@ public class Discordmc implements ModInitializer {
 		// This code runs as soon as Minecraft is in a mod-load-ready state.
 		// However, some things (like resources) may still be uninitialized.
 		// Proceed with mild caution.
+		//create logger
 
 		LOGGER.info("Hello Fabric world!");
 
-		JDABuilder jdaBuilder = JDABuilder.createDefault("")
+		// read bot.token from file
+
+		String token = "";
+		try {
+			token = Files.readString(Path.of("bot.token"));
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		JDABuilder jdaBuilder = JDABuilder.createDefault(token)
 				.enableIntents(GatewayIntent.MESSAGE_CONTENT, GatewayIntent.GUILD_MESSAGES)
 				.addEventListeners(new Discordmc());
 		JDA jda = jdaBuilder.build();
 	}
 	public void onMessageReceived(MessageReceivedEvent event) {
-		System.out.println("received a message from " + event.getAuthor().getName() + ": " + event.getMessage().getContentRaw());
+		assert mc.player != null;
+		String currentServerNiceName = "test";
 
-		if (event.getChannel().getName().equals("testchannel")) {
-			if (!(mc.player == null))
-				mc.player.sendMessage(Text.of("§9<" + event.getAuthor().getName() + ">§b " + event.getMessage().getContentRaw()));
 
+		System.out.println("Received a message from " + event.getAuthor().getName() + ": " + event.getMessage().getContentRaw());
+
+		if (event.getChannel().getName().equals("all-servers") || event.getChannel().getName().equals(currentServerNiceName)) {
+			MutableText name = Text.literal("<" + event.getAuthor().getName() + ">").formatted(Formatting.GRAY);
+            MutableText text = Text.literal(" " + event.getMessage().getContentRaw()).formatted(Formatting.WHITE);
+
+			if (event.getAuthor().getName().equalsIgnoreCase(mc.player.getName().getString())) {
+				// if its sent by you
+				name = Text.literal("<" + event.getAuthor().getName() + ">").formatted(Formatting.BLUE);
+			}
+			MutableText finalText = name.append(text);
+
+			mc.player.sendMessage(finalText);
 
 			if (event.getMessage().getContentRaw().equals("ping")) {
 				event.getChannel().sendMessage("pong").queue();
 			}
 		}
+	}
+	public static void getServerName() {
+		assert mc.player != null;
+		String serverIp = Objects.requireNonNull(mc.player.getServer()).getServerIp();
+		String serverName = serverIp.substring(0, serverIp.indexOf("."));
+		String serverNiceName = serverName.substring(0, 1).toUpperCase() + serverName.substring(1);
+		System.out.println(serverNiceName);
 	}
 }
