@@ -1,16 +1,16 @@
 package com.mrbreaknfix.mixin;
 
-import com.mojang.datafixers.kinds.IdF;
 import com.mrbreaknfix.Discordmc;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.ChatScreen;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.MultilineTextWidget;
-import net.minecraft.client.gui.widget.TextWidget;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import org.jetbrains.annotations.NotNull;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -33,20 +33,39 @@ public class ChatScreenMixin extends Screen {
 			mc.setScreen(null);
 			cir.setReturnValue(false);
 		}
+
+		if (Discordmc.discordChatEnabled && !chatText.startsWith("/") && !chatText.startsWith(".") && !chatText.startsWith(",")) {
+
+			Discordmc.sendDiscordMessage(chatText, Discordmc.currentGuild, Discordmc.currentChat);
+
+			mc.setScreen(null);
+			cir.setReturnValue(false);
+		}
 	}
 	@Inject(at = @At("TAIL"), method = "init")
 	public void init(CallbackInfo ci) {
 		MinecraftClient mc = MinecraftClient.getInstance();
 
-		int bottomLeftCornerX = 5 - 25;
-		int bottomLeftCornerY = mc.getWindow().getScaledHeight() - 14;
+		MutableText channel = Text.literal(Discordmc.currentChat + "   ").formatted(Formatting.WHITE);
+		MutableText guild = Text.literal(Discordmc.currentGuild).formatted(Formatting.WHITE);
 
-		MutableText chatDestination = Text.literal(Discordmc.currentChat).formatted(Formatting.WHITE);
+		MutableText chatDestination = Text.literal("Chatting to: ").formatted(Formatting.GRAY).append(guild).append(Text.literal(", in #").formatted(Formatting.GRAY)).append(channel);
 
-		MutableText text = Text.literal("Chat to: ").formatted(Formatting.GRAY).append(chatDestination);
+		MutableText text = Text.literal("").formatted(Formatting.GRAY).append(chatDestination);
 
-		MultilineTextWidget multilineTextWidget = new MultilineTextWidget(text, this.textRenderer);
-		multilineTextWidget.setPosition(bottomLeftCornerX, bottomLeftCornerY);
+		if (!Discordmc.discordChatEnabled) {
+			text = Text.literal("disabled").formatted(Formatting.DARK_GRAY);
+		}
+
+		MultilineTextWidget multilineTextWidget = getTextWidget(text, mc);
 		addDrawableChild(multilineTextWidget);
+	}
+
+	@Unique
+	@NotNull
+	private MultilineTextWidget getTextWidget(MutableText text, MinecraftClient mc) {
+		MultilineTextWidget multilineTextWidget = new MultilineTextWidget(text, this.textRenderer);
+		multilineTextWidget.setPosition(mc.getWindow().getScaledWidth() - multilineTextWidget.getWidth() - 2, mc.getWindow().getScaledHeight() - 25);
+		return multilineTextWidget;
 	}
 }
