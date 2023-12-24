@@ -1,6 +1,6 @@
 package com.mrbreaknfix.mixin;
 
-import com.mrbreaknfix.Discordmc;
+import com.mrbreaknfix.DiscordMC;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.ChatScreen;
 import net.minecraft.client.gui.screen.Screen;
@@ -28,15 +28,15 @@ public class ChatScreenMixin extends Screen {
 	public void sendMessage(String chatText, boolean addToHistory, CallbackInfoReturnable<Boolean> cir) {
 		MinecraftClient mc = MinecraftClient.getInstance();
 		if(chatText.toLowerCase().startsWith(".d") || (chatText.toLowerCase().startsWith(",d"))) {
-			Discordmc.sendDiscordMessage(chatText.substring(3), Discordmc.currentGuild, Discordmc.currentChat);
+			DiscordMC.sendDiscordMessage(chatText.substring(3), DiscordMC.currentGuild, DiscordMC.currentChat);
 
 			mc.setScreen(null);
 			cir.setReturnValue(false);
 		}
 
-		if (Discordmc.discordChatEnabled && !chatText.startsWith("/") && !chatText.startsWith(".") && !chatText.startsWith(",")) {
+		if (DiscordMC.discordChatEnabled && !chatText.startsWith("/") && !chatText.startsWith(".") && !chatText.startsWith(",")) {
 
-			Discordmc.sendDiscordMessage(chatText, Discordmc.currentGuild, Discordmc.currentChat);
+			DiscordMC.sendDiscordMessage(chatText, DiscordMC.currentGuild, DiscordMC.currentChat);
 
 			mc.setScreen(null);
 			cir.setReturnValue(false);
@@ -46,18 +46,17 @@ public class ChatScreenMixin extends Screen {
 	public void init(CallbackInfo ci) {
 		MinecraftClient mc = MinecraftClient.getInstance();
 
-		MutableText channel = Text.literal(Discordmc.currentChat + "   ").formatted(Formatting.WHITE);
-		MutableText guild = Text.literal(Discordmc.currentGuild).formatted(Formatting.WHITE);
-
-		MutableText chatDestination = Text.literal("Chatting to: ").formatted(Formatting.GRAY).append(guild).append(Text.literal(", in #").formatted(Formatting.GRAY)).append(channel);
-
-		MutableText text = Text.literal("").formatted(Formatting.GRAY).append(chatDestination);
-
-		if (!Discordmc.discordChatEnabled) {
-			text = Text.literal("disabled").formatted(Formatting.DARK_GRAY);
+		var channelID = DiscordMC.config.sendingChannelID;
+		if (channelID.isEmpty()) {
+			return;
 		}
 
-		MultilineTextWidget multilineTextWidget = getTextWidget(text, mc);
+		var channelName = DiscordMC.config.cacheChannelNames.get(channelID);
+
+		MutableText chatDestination = Text.literal("Chatting in #").formatted(Formatting.GRAY)
+				.append(channelName).formatted(Formatting.GRAY);
+
+		MultilineTextWidget multilineTextWidget = getTextWidget(chatDestination, mc);
 		addDrawableChild(multilineTextWidget);
 	}
 
