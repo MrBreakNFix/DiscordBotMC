@@ -3,7 +3,7 @@
 	"package": "com.mrbreaknfix.mixin",
 	"compatibilityLevel": "JAVA_17",
 	"mixins": [
-		"ExampleMixin"
+		"ChatScreenMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
