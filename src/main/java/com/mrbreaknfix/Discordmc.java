@@ -8,6 +8,7 @@ import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.fabricmc.api.ModInitializer;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.MutableText;
+import net.minecraft.text.Style;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import org.slf4j.Logger;
@@ -67,7 +68,7 @@ public class Discordmc extends ListenerAdapter implements ModInitializer {
 			MutableText text = Text.literal(" " + event.getMessage().getContentRaw()).formatted(Formatting.WHITE);
 
 			if (event.getAuthor().getName().equalsIgnoreCase(mc.player.getName().getString())) {
-				name = Text.literal("<" + event.getAuthor().getName() + ">").formatted(Formatting.BLUE);
+				name = Text.literal("<" + event.getAuthor().getName() + ">").setStyle(Style.EMPTY.withColor(0x5865F2));
 			}
 			MutableText finalText = name.append(text);
 
