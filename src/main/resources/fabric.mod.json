@@ -16,7 +16,7 @@
 	"environment": "*",
 	"entrypoints": {
 		"main": [
-          "com.mrbreaknfix.DiscordMC"
+			"com.mrbreaknfix.Discordmc"
 		]
 	},
 	"mixins": [
