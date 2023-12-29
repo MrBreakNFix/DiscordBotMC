@@ -25,13 +25,6 @@ public class ChatScreenMixin extends Screen {
     @Inject(at = @At("HEAD"), method = "sendMessage", cancellable = true)
     public void sendMessage(String chatText, boolean addToHistory, CallbackInfoReturnable<Boolean> cir) {
         MinecraftClient mc = MinecraftClient.getInstance();
-        if(chatText.toLowerCase().startsWith(".d") || (chatText.toLowerCase().startsWith(",d"))) {
-            Discordmc.sendDiscordMessage(chatText.substring(3), Discordmc.config.getCurrentGuild(), Discordmc.config.getCurrentChat());
-
-            mc.setScreen(null);
-            cir.setReturnValue(false);
-        }
-
         if (Discordmc.config.isDiscordChatEnabled() && !chatText.startsWith("/") && !chatText.startsWith(".") && !chatText.startsWith(",")) {
 
             Discordmc.sendDiscordMessage(chatText, Discordmc.config.getCurrentGuild(), Discordmc.config.getCurrentChat());
@@ -50,10 +43,14 @@ public class ChatScreenMixin extends Screen {
 
         MutableText chatDestination = Text.literal("Chatting to: ").formatted(Formatting.GRAY).append(guild).append(Text.literal(", in #").formatted(Formatting.GRAY)).append(channel);
 
-        MutableText text = Text.literal("").formatted(Formatting.GRAY).append(chatDestination);
+        MutableText text = Text.literal("").formatted(Formatting.GREEN).append(chatDestination);
 
         if (!Discordmc.config.isDiscordChatEnabled()) {
-            text = Text.literal("disabled").formatted(Formatting.DARK_GRAY);
+            text = Text.literal("").formatted(Formatting.DARK_GRAY).append(chatDestination);
+        }
+        // warn the user if the bot token is set to the default value
+        if (Discordmc.config.getBotToken().equals("Your bot token") || Discordmc.jda == null) {
+            text = Text.literal("").formatted(Formatting.RED).append(Text.literal("WARNING: ").formatted(Formatting.RED)).append(Text.literal("You do not have a valid token set! You can do this with \"/dc SetBotToken your-bot-token\", you can also do \"/dc help\" for a list of commands!").formatted(Formatting.RED));
         }
 
         MultilineTextWidget multilineTextWidget = getTextWidget(text, mc);
@@ -64,7 +61,10 @@ public class ChatScreenMixin extends Screen {
     @NotNull
     private MultilineTextWidget getTextWidget(MutableText text, MinecraftClient mc) {
         MultilineTextWidget multilineTextWidget = new MultilineTextWidget(text, this.textRenderer);
-        multilineTextWidget.setPosition(mc.getWindow().getScaledWidth() - multilineTextWidget.getWidth() - 2, mc.getWindow().getScaledHeight() - 25);
+        // bottom right version
+//        multilineTextWidget.setPosition(mc.getWindow().getScaledWidth() - multilineTextWidget.getWidth() - 2, mc.getWindow().getScaledHeight() - 25); // bottom right version
+        // top right version
+        multilineTextWidget.setPosition(mc.getWindow().getScaledWidth() - multilineTextWidget.getWidth() - 2, 2); // top right version
         return multilineTextWidget;
     }
 }

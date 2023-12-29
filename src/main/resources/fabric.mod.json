@@ -2,15 +2,19 @@
 	"schemaVersion": 1,
 	"id": "discordmc",
 	"version": "${version}",
-	"name": "Discordmc",
-	"description": "This is an example description! Tell everyone what your mod is about!",
-	"authors": [
-		"Me!"
-	],
+	"name": "Discord MC",
+	"description": "Lets you use talk to your friends in discord while playing minecraft.",
 	"contact": {
-		"homepage": "https://fabricmc.net/",
-		"sources": "https://github.com/FabricMC/fabric-example-mod"
+		"homepage": "https://mrbreaknfix.com/discordmc",
+		"sources": "https://github.com/MrBreakNFix/discordmc",
+		"issues": "https://github.com/MrBreakNFix/discordmc/issues"
 	},
+	"authors": [
+		"MrBreakNFix"
+	],
+	"contributors": [
+		"FlexCoral"
+	],
 	"license": "CC0-1.0",
 	"icon": "assets/discordmc/icon.png",
 	"environment": "*",
