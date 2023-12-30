@@ -1,6 +1,7 @@
 package com.mrbreaknfix;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.annotations.SerializedName;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.sun.source.tree.LiteralTree;
@@ -9,6 +10,7 @@ import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.channel.Channel;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -24,14 +26,13 @@ import net.minecraft.command.CommandSource;
 import net.minecraft.text.*;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.math.MathHelper;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Environment(EnvType.CLIENT)
@@ -59,85 +60,76 @@ public class Discordmc extends ListenerAdapter implements ModInitializer {
                     .executes(context -> {
                         updateNameCaches();
                         return 1;
-                    })
+                    }))
                 .then(ClientCommandManager.literal("listen")
                     .executes(context -> {
                         listListeningChannels();
                         return 1;
-                    })
-                .then(ClientCommandManager.literal("toggle")
-                    .executes(context -> {
-                        listListeningChannels();
-                        return 1;
-                    })
+                    }))
                 .then(ClientCommandManager.literal("enable")
                     .executes(context -> {
                         config.enabled = true;
                         mc.player.sendMessage(Text.of("DiscordMC ENABLED"));
                         return 1;
-                    })
-                .then(ClientCommandManager.literal("enable")
+                    }))
+                .then(ClientCommandManager.literal("disable")
                     .executes(context -> {
                         config.enabled = false;
                         mc.player.sendMessage(Text.of("DiscordMC DISABLED"));
                         return 1;
-                    })
-                .then(ClientCommandManager.literal("cache")
+                    }))
+                .then(ClientCommandManager.literal("toggle")
                     .executes(context -> {
-                        listCache();
+                        toggle();
                         return 1;
-                    })
-                .then(ClientCommandManager.argument("dest", StringArgumentType.string())
-                    .suggests((context, builder) -> CommandSource.suggestMatching(getGuilds(), builder))
+                    }))
+                .then(ClientCommandManager.literal("select")
+                    .executes(context -> {
+                        select();
+                        return 1;
+                    }))
+                .then(ClientCommandManager.literal("debug")
                     .executes((context) -> {
-                        mc.player.sendMessage(Text.literal("Switched to guild: " + StringArgumentType.getString(context, "guild")));
-                        config.setCurrentGuild(StringArgumentType.getString(context, "guild"));
-                        saveConfig();
+                        var r = Text.literal("Sending list:");
+                        for (String sendingChannel : config.sendingChannels) {
+                            r.append("\n"+sendingChannel);
+                        }
+                        r.append("\nListening list:");
+                        for (String listeningChannel : config.listeningChannels) {
+                            r.append("\n"+listeningChannel);
+                        }
+                        mc.player.sendMessage(r);
+                        return 1;
+                    }))
+                .then(ClientCommandManager.literal("setToken")
+                    .then(ClientCommandManager.argument("token", StringArgumentType.string())
+                    .executes((context) -> {
+                        setBotToken(StringArgumentType.getString(context, "token"));
                         return 1;
                     })))
-                // choose channel
-                .then(ClientCommandManager.literal("channel").then(ClientCommandManager.argument("channel", StringArgumentType.string())
-                        .suggests((context, builder) -> {
-                            return CommandSource.suggestMatching(listAllChannelNamesInCurrentGuild(), builder);
-                        })
-                        .executes((context) -> {
-                            mc.player.sendMessage(Text.literal("Switched to channel: " + StringArgumentType.getString(context, "channel")));
-                            config.setCurrentChat(StringArgumentType.getString(context, "channel"));
-                            saveConfig();
-                            return 1;
-                        })))
-                .then(ClientCommandManager.literal("toggle")
-                        .executes((context) -> {
-                            mc.player.sendMessage(Text.literal("Discord chat is now " + (config. ? "off." : "on.")));
-                            toggleChat();
-                            return 1;
-                        })
-                )
-                .then(ClientCommandManager.literal("display"))
-                .then(ClientCommandManager.literal("setToken")
-                        .then(ClientCommandManager.argument("token", StringArgumentType.string())
-                                .executes((context) -> {
-                                    if (StringArgumentType.getString(context, "token").length() != 73) {
-                                        mc.player.sendMessage(Text.literal("Bot token updated, connecting to Discord..."));
-                                        config.botToken = (StringArgumentType.getString(context, "token"));
-                                        createJDA(StringArgumentType.getString(context, "token"));
-                                        saveConfig();
-                                    } else {
-                                        mc.player.sendMessage(Text.literal("A discord bot token is exactly 73 characters long, yours is " + StringArgumentType.getString(context, "token").length() + ". Please provide a valid discord bot token."));
-                                    }
-                                    return 1;
-                                })))
-                .then(ClientCommandManager.literal("help")
-                        .executes((context) -> {
-                            mc.player.sendMessage(Text.literal("Welcome to ").formatted(Formatting.GRAY).append(Text.literal("DiscordMC")).setStyle(Style.EMPTY.withColor(MathHelper.packRgb(64, 58, 0)).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.of("https://github.com/MrBreakNFix/DiscordMC")))).append(Text.literal(" by ")).formatted(Formatting.GRAY).append(Text.literal("MrBreakNFix!").formatted(Formatting.BLUE)));
-                            mc.player.sendMessage(Text.literal("Here is a list of commands, click on each for more:"));
-                            MutableText guildHelp = Text.literal("/dc guild <guild name>").formatted(Formatting.GRAY);
-                            guildHelp.setStyle(Style.EMPTY.withColor(Formatting.BLUE).withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, "test")));
-                            return 1;
-                        }))
-
+                .then(ClientCommandManager.literal("dest")
+                    .executes(context -> {
+                        select();
+                        return 1;
+                    })
+                    .then(ClientCommandManager.argument("channel id", StringArgumentType.string())
+                    .executes((context) -> {
+                        setSendingChannel(StringArgumentType.getString(context, "channel id"));
+                        return 1;
+                    })))
             );
         });
+    }
+
+    private void setBotToken(String t) {
+        if (t.length() != 73) {
+            mc.player.sendMessage(Text.literal("Bot token updated, connecting to Discord..."));
+            config.botToken = t;
+            createJDA(t);
+            saveConfig();
+        } else {
+            mc.player.sendMessage(Text.literal("A discord bot token is exactly 73 characters long, yours is " + t.length() + ". Please provide a valid discord bot token."));
+        }
     }
 
     private void createJDA(String token) {
@@ -161,7 +153,7 @@ public class Discordmc extends ListenerAdapter implements ModInitializer {
                     "2. Are you online? The bot cant connect to discord if you are offline.\n", e);
         }
     }
-    public void onMessageReceived(MessageReceivedEvent event) {
+    public void onMessageReceived(@NotNull MessageReceivedEvent event) {
         if (mc.player == null) {
             LOGGER.info("Dropping Discord message from " + event.getAuthor().getName() + " because player is null");
             return;
@@ -199,8 +191,7 @@ public class Discordmc extends ListenerAdapter implements ModInitializer {
     }
 
     public static void sendDiscordMessage(String message) {
-        if (jda == null) {
-            mc.player.sendMessage(Text.literal("DiscordMC is not connected to a bot or is invalid, please set/reset your bot token with \"/dc SetBotToken your-bot-token\", or disable DiscordMC with \"/dc toggle\"."));
+        if (!config.enabled) {
             return;
         }
         if (config.sendingChannels.isEmpty()) {
@@ -209,6 +200,10 @@ public class Discordmc extends ListenerAdapter implements ModInitializer {
         }
         if (config.sendingChannels.get(0).isEmpty()) {
             LOGGER.info("Not sending message to discord because sending blocked");
+            return;
+        }
+        if (jda == null) {
+            mc.player.sendMessage(Text.literal("DiscordMC is not connected to a bot or is invalid, please set/reset your bot token with \"/dc SetBotToken your-bot-token\", or disable DiscordMC with \"/dc toggle\"."));
             return;
         }
         var chan = jda.getTextChannelById(config.sendingChannels.get(0));
@@ -225,45 +220,36 @@ public class Discordmc extends ListenerAdapter implements ModInitializer {
             config.sendingChannels.remove(0);
             return;
         }
-        chan.sendMessage(message);
+        chan.sendMessage(message).queue();
     }
 
-    public static List<String> getGuilds() {
-        if (jda == null) {
-            return Collections.singletonList("No guilds found");
-        }
-        List<String> guilds = new java.util.ArrayList<>(jda.getGuilds().stream().map(Guild::getName).toList());
-        guilds.replaceAll(s -> "\"" + s + "\"");
-        return guilds;
-    }
-
-    public static void toggleSending() {
-        if (config.sendingChannels.isEmpty()) {
-            mc.player.sendMessage(Text.of("Was not sending to any channel, nothing to toggle."));
-            return;
-        }
-        if (config.sendingChannels.get(0).isEmpty()) {
-            mc.player.sendMessage(Text.of("Discord messages sending ENABLED"));
-            config.sendingChannels.remove(0);
-        } else {
-            mc.player.sendMessage(Text.of("Discord messages sending DISABLED"));
-            config.sendingChannels.add(0, "");
-        }
-    }
-
-    public static void toggleListening() {
-        if (config.listeningChannels.isEmpty()) {
-            mc.player.sendMessage(Text.of("Was not listening to any channel, nothing to toggle."));
-            return;
-        }
-        if (config.listeningChannels.get(0).isEmpty()) {
-            mc.player.sendMessage(Text.of("Discord messages listening ENABLED"));
-            config.listeningChannels.remove(0);
-        } else {
-            mc.player.sendMessage(Text.of("Discord messages listening DISABLED"));
-            config.listeningChannels.add(0, "");
-        }
-    }
+//    public static void toggleSending() {
+//        if (config.sendingChannels.isEmpty()) {
+//            mc.player.sendMessage(Text.of("Was not sending to any channel, nothing to toggle."));
+//            return;
+//        }
+//        if (config.sendingChannels.get(0).isEmpty()) {
+//            mc.player.sendMessage(Text.of("Discord messages sending ENABLED"));
+//            config.sendingChannels.remove(0);
+//        } else {
+//            mc.player.sendMessage(Text.of("Discord messages sending DISABLED"));
+//            config.sendingChannels.add(0, "");
+//        }
+//    }
+//
+//    public static void toggleListening() {
+//        if (config.listeningChannels.isEmpty()) {
+//            mc.player.sendMessage(Text.of("Was not listening to any channel, nothing to toggle."));
+//            return;
+//        }
+//        if (config.listeningChannels.get(0).isEmpty()) {
+//            mc.player.sendMessage(Text.of("Discord messages listening ENABLED"));
+//            config.listeningChannels.remove(0);
+//        } else {
+//            mc.player.sendMessage(Text.of("Discord messages listening DISABLED"));
+//            config.listeningChannels.add(0, "");
+//        }
+//    }
 
     public static void toggle() {
         if (mc.player == null) {
@@ -276,22 +262,26 @@ public class Discordmc extends ListenerAdapter implements ModInitializer {
             config.enabled = true;
             mc.player.sendMessage(Text.of("DiscordMC ENABLED"));
         }
+        saveConfig();
     }
 
-    public static void listCache() {
+    public static void select() {
         if (mc.player == null) {
             return;
         }
-        StringBuilder r = new StringBuilder();
-        r.append("Guilds names: ").append(config.guildNamesCache.size());
-        config.guildNamesCache.forEach((s, s2) -> {
-            r.append("\n").append(s).append(" ").append(s2);
-        });
-        r.append("\nChannels names: ").append(config.channelNamesCache.size());
-        config.channelNamesCache.forEach((s, s2) -> {
-            r.append("\n").append(s).append(" ").append(s2);
-        });
-        mc.player.sendMessage(Text.of(r.toString()));
+        var ret = Text.empty();
+        ret.append(Text.literal("Select destination:"));
+        var g = jda.getGuilds();
+        for (Guild guild : g) {
+            var c = guild.getTextChannels();
+            for (GuildChannel channel : c) {
+                ret.append(Text.literal("\n  " + guild.getName() + " #" + channel.getName()).setStyle(
+                    Style.EMPTY.withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/dc dest " + channel.getId()))
+                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal("Click to select channel "+ channel.getId())))
+                ));
+            }
+        }
+        mc.player.sendMessage(ret);
     }
 
     public static void listListeningChannels() {
@@ -339,6 +329,29 @@ public class Discordmc extends ListenerAdapter implements ModInitializer {
         for (Guild guild : guilds) {
             config.guildNamesCache.put(guild.getId(), guild.getName());
         }
+        saveConfig();
+    }
+
+    public static String getSendingChannel() {
+        if (config.sendingChannels.isEmpty()) {
+            return "";
+        }
+        var ch = config.sendingChannels.get(0);
+        return config.channelNamesCache.getOrDefault(ch, ch);
+    }
+
+    public static void setSendingChannel(String id) {
+        config.sendingChannels.remove("");
+        config.sendingChannels.remove(id);
+        config.sendingChannels.add(0, id);
+        config.listeningChannels.remove("");
+        config.listeningChannels.remove(id);
+        config.listeningChannels.add(0, id);
+        saveConfig();
+        if (mc.player == null) {
+            return;
+        }
+        mc.player.sendMessage(Text.literal("Channel changed to " + id));
     }
 
     public static Path getConfigPath() {
@@ -347,7 +360,10 @@ public class Discordmc extends ListenerAdapter implements ModInitializer {
 
     public static void saveConfig() {
         try {
-            String configJson = GSON.toJson(config);
+            Gson gson = new GsonBuilder()
+                .setPrettyPrinting()
+                .create();
+            String configJson = gson.toJson(config);
             Files.writeString(getConfigPath(), configJson);
         } catch (Exception e) {
             LOGGER.error("Error saving config: ", e);
@@ -371,16 +387,16 @@ public class Discordmc extends ListenerAdapter implements ModInitializer {
 
     public static class Config {
         @SerializedName("token")
-        public String botToken;
+        public String botToken = "";
         @SerializedName("enabled")
-        public boolean enabled;
+        public boolean enabled = false;
         @SerializedName("sendingChannels")
-        public List<String> sendingChannels;
+        public List<String> sendingChannels = new ArrayList<>();
         @SerializedName("listeningChannels")
-        public List<String> listeningChannels;
+        public List<String> listeningChannels = new ArrayList<>();
         @SerializedName("channelNamesCache")
-        public Map<String, String> channelNamesCache;
+        public Map<String, String> channelNamesCache = new TreeMap<>();
         @SerializedName("guildNamesCache")
-        public Map<String, String> guildNamesCache;
+        public Map<String, String> guildNamesCache = new TreeMap<>();
     }
 }

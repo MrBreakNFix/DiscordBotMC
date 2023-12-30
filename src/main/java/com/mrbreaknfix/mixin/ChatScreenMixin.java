@@ -16,42 +16,35 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import static com.mrbreaknfix.Discordmc.sendDiscordMessage;
+
 @Mixin(ChatScreen.class)
 public class ChatScreenMixin extends Screen {
     protected ChatScreenMixin(Text title) {
         super(title);
     }
 
-    @Inject(at = @At("HEAD"), method = "sendMessage", cancellable = true)
+    @Inject(at = @At("HEAD"), method = "sendMessage")
     public void sendMessage(String chatText, boolean addToHistory, CallbackInfoReturnable<Boolean> cir) {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (Discordmc.config.isDiscordChatEnabled() && !chatText.startsWith("/") && !chatText.startsWith(".") && !chatText.startsWith(",")) {
-
-            Discordmc.sendDiscordMessage(chatText, Discordmc.config.getCurrentGuild(), Discordmc.config.getCurrentChat());
-
-            mc.setScreen(null);
-            cir.setReturnValue(false);
+        if (chatText.startsWith("/") || chatText.startsWith(".") || chatText.startsWith(",")) {
+            return;
         }
+        sendDiscordMessage(chatText);
     }
 
     @Inject(at = @At("TAIL"), method = "init")
     public void init(CallbackInfo ci) {
         MinecraftClient mc = MinecraftClient.getInstance();
 
-        MutableText channel = Text.literal(Discordmc.config.getCurrentChat() + "   ").formatted(Formatting.WHITE);
-        MutableText guild = Text.literal(Discordmc.config.getCurrentGuild()).formatted(Formatting.WHITE);
+        var cc = Discordmc.getSendingChannel();
+        if (cc.isEmpty() || !Discordmc.config.enabled) {
+            return;
+        }
 
-        MutableText chatDestination = Text.literal("Chatting to: ").formatted(Formatting.GRAY).append(guild).append(Text.literal(", in #").formatted(Formatting.GRAY)).append(channel);
+        MutableText channel = Text.literal( cc + "   ").formatted(Formatting.WHITE);
+        MutableText chatDestination = Text.literal("Chatting in #").formatted(Formatting.GRAY).append(channel);
 
         MutableText text = Text.literal("").formatted(Formatting.GREEN).append(chatDestination);
-
-        if (!Discordmc.config.isDiscordChatEnabled()) {
-            text = Text.literal("").formatted(Formatting.DARK_GRAY).append(chatDestination);
-        }
-        // warn the user if the bot token is set to the default value
-        if (Discordmc.config.getBotToken().equals("Your bot token") || Discordmc.jda == null) {
-            text = Text.literal("").formatted(Formatting.RED).append(Text.literal("WARNING: ").formatted(Formatting.RED)).append(Text.literal("You do not have a valid token set! You can do this with \"/dc SetBotToken your-bot-token\", you can also do \"/dc help\" for a list of commands!").formatted(Formatting.RED));
-        }
 
         MultilineTextWidget multilineTextWidget = getTextWidget(text, mc);
         addDrawableChild(multilineTextWidget);
