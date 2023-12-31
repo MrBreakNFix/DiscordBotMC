@@ -185,6 +185,15 @@ public class Discordmc extends ListenerAdapter implements ModInitializer {
         // I might be wrong, if so please elaborate on your decision to include this.
 
         MutableText name = Text.literal("<" + event.getAuthor().getName() + ">").formatted(Formatting.GRAY);
+        if (true) {
+
+            String fancyname = event.getChannel().getName().toUpperCase().replace("A", "ᴀ").replace("B", "ʙ").replace("C", "ᴄ").replace("D", "ᴅ").replace("E", "ᴇ").replace("F", "ғ").replace("G", "ɢ").replace("H",
+            "ʜ").replace("I", "ɪ").replace("J", "ᴊ").replace("K", "ᴋ").replace("L", "ʟ").replace("M", "ᴍ").replace("N", "ɴ").replace(
+                    "O", "ᴏ").replace("P", "ᴘ").replace("Q", "ǫ").replace("R",
+            "ʀ").replace("S", "s").replace("T", "ᴛ").replace("U", "ᴜ").replace("V", "ᴠ").replace("W", "ᴡ").replace("X", "").replace("Y", "ʏ").replace("Z", "ᴢ").replace("1", "𝟷").replace("2", "𝟸").replace("3", "𝟹").replace("4", "𝟺").replace("5", "𝟻").replace("6", "𝟼").replace("7", "𝟽").replace("8", "𝟾").replace("9", "𝟿").replace("0", "𝟶");
+
+            name = Text.literal("#" + fancyname).formatted(Formatting.DARK_AQUA).append(Text.literal(" <" + event.getAuthor().getName() + ">").formatted(Formatting.GRAY));
+        }
         MutableText text = Text.literal(" " + event.getMessage().getContentRaw()).formatted(Formatting.WHITE);
 
 //        if (event.getAuthor().getName().equalsIgnoreCase(mc.player.getName().getString())) {
@@ -281,7 +290,7 @@ public class Discordmc extends ListenerAdapter implements ModInitializer {
         var ret = Text.empty();
         ret.append(Text.literal("Select destination:"));
         var g = jda.getGuilds();
-        int counter = 0;
+        int i = 0;
         for (Guild guild : g) {
             var c = guild.getTextChannels();
             for (TextChannel channel : c) {
@@ -292,12 +301,12 @@ public class Discordmc extends ListenerAdapter implements ModInitializer {
                         Style.EMPTY.withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/dc dest " + channel.getId()))
                                 .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal("Click to select channel " + channel.getId())))
                 );
-                if (counter % 2 == 1) {
+                if (i % 2 == 1) {
                     channelText = channelText.formatted(Formatting.GRAY);
                 }
                 ret.append(channelText);
             }
-            counter++;
+            i++;
         }
         mc.player.sendMessage(ret);
     }
