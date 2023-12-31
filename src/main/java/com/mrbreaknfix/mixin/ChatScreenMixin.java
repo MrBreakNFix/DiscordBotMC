@@ -24,12 +24,17 @@ public class ChatScreenMixin extends Screen {
         super(title);
     }
 
-    @Inject(at = @At("HEAD"), method = "sendMessage")
+    @Inject(at = @At("HEAD"), method = "sendMessage", cancellable = true)
     public void sendMessage(String chatText, boolean addToHistory, CallbackInfoReturnable<Boolean> cir) {
         if (chatText.startsWith("/") || chatText.startsWith(".") || chatText.startsWith(",")) {
             return;
         }
-        sendDiscordMessage(chatText);
+        // Why would you want discord messages sent to the server?
+        if (Discordmc.config.enabled) {
+            sendDiscordMessage(chatText);
+            cir.setReturnValue(false);
+            MinecraftClient.getInstance().setScreen(null);
+        }
     }
 
     @Inject(at = @At("TAIL"), method = "init")
@@ -41,7 +46,7 @@ public class ChatScreenMixin extends Screen {
             return;
         }
 
-        MutableText channel = Text.literal( cc + "   ").formatted(Formatting.WHITE);
+        MutableText channel = Text.literal( cc + " ").formatted(Formatting.WHITE);
         MutableText chatDestination = Text.literal("Chatting in #").formatted(Formatting.GRAY).append(channel);
 
         MutableText text = Text.literal("").formatted(Formatting.GREEN).append(chatDestination);

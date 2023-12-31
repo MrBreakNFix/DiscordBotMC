@@ -4,14 +4,10 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.annotations.SerializedName;
 import com.mojang.brigadier.arguments.StringArgumentType;
-import com.sun.source.tree.LiteralTree;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.entities.channel.Channel;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
-import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
-import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.requests.GatewayIntent;
@@ -22,18 +18,18 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.command.CommandSource;
 import net.minecraft.text.*;
 import net.minecraft.util.Formatting;
-import net.minecraft.util.math.MathHelper;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 @Environment(EnvType.CLIENT)
 public class Discordmc extends ListenerAdapter implements ModInitializer {
@@ -45,7 +41,11 @@ public class Discordmc extends ListenerAdapter implements ModInitializer {
 
     @Override
     public void onInitialize() {
+
+
         LOGGER.info("DiscordMC initializing...");
+
+
         loadConfig();
 
         if (!config.botToken.isEmpty()) {
@@ -53,6 +53,8 @@ public class Discordmc extends ListenerAdapter implements ModInitializer {
         }
 
         updateNameCaches();
+
+
 
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             dispatcher.register(ClientCommandManager.literal("dc")
@@ -174,10 +176,13 @@ public class Discordmc extends ListenerAdapter implements ModInitializer {
             LOGGER.info("Dropping Discord message from " + event.getAuthor().getName() + " because not listening for that channel");
             return;
         }
-        if (event.getJDA().getSelfUser().getId().equals(event.getAuthor().getId())) {
-            LOGGER.info("Dropping Discord message from " + event.getAuthor().getName() + " because it is self-message");
-            return;
-        }
+//        if (event.getJDA().getSelfUser().getId().equals(event.getAuthor().getId())) {
+//            LOGGER.info("Dropping Discord message from " + event.getAuthor().getName() + " because it is self-message");
+//            return;
+//        }
+
+        // ... why did you do this? The point is when you send discord messages they don't get sent to the minecraft server...
+        // I might be wrong, if so please elaborate on your decision to include this.
 
         MutableText name = Text.literal("<" + event.getAuthor().getName() + ">").formatted(Formatting.GRAY);
         MutableText text = Text.literal(" " + event.getMessage().getContentRaw()).formatted(Formatting.WHITE);
@@ -220,7 +225,11 @@ public class Discordmc extends ListenerAdapter implements ModInitializer {
             config.sendingChannels.remove(0);
             return;
         }
-        chan.sendMessage(message).queue();
+        try {
+            chan.sendMessage(message).queue();
+        } catch (Exception e) {
+            LOGGER.error("Error sending message to Discord: ", e); // temp for insufficient permissions
+        }
     }
 
 //    public static void toggleSending() {
@@ -272,14 +281,23 @@ public class Discordmc extends ListenerAdapter implements ModInitializer {
         var ret = Text.empty();
         ret.append(Text.literal("Select destination:"));
         var g = jda.getGuilds();
+        int counter = 0;
         for (Guild guild : g) {
             var c = guild.getTextChannels();
-            for (GuildChannel channel : c) {
-                ret.append(Text.literal("\n  " + guild.getName() + " #" + channel.getName()).setStyle(
-                    Style.EMPTY.withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/dc dest " + channel.getId()))
-                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal("Click to select channel "+ channel.getId())))
-                ));
+            for (TextChannel channel : c) {
+                if (!(channel).canTalk()) {
+                    continue;
+                }
+                var channelText = Text.literal("\n  " + guild.getName() + " #" + channel.getName()).setStyle(
+                        Style.EMPTY.withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/dc dest " + channel.getId()))
+                                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal("Click to select channel " + channel.getId())))
+                );
+                if (counter % 2 == 1) {
+                    channelText = channelText.formatted(Formatting.GRAY);
+                }
+                ret.append(channelText);
             }
+            counter++;
         }
         mc.player.sendMessage(ret);
     }
